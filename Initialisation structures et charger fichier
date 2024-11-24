@@ -1,0 +1,74 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_NODES 100
+#define MAX_NAME_LENGTH 50
+
+// Structure pour représenter un nœud
+typedef struct Node {
+    char name[MAX_NAME_LENGTH];
+    struct Node* next;
+} Node;
+
+// Structure pour représenter le graphe
+typedef struct Graph {
+    int num_nodes;
+    char nodes[MAX_NODES][MAX_NAME_LENGTH];
+    Node* adjacency_list[MAX_NODES];
+} Graph;
+
+// Initialiser le graphe
+void initialize_graph(Graph* graph) {
+    graph->num_nodes = 0;
+    for (int i = 0; i < MAX_NODES; i++) {
+        graph->adjacency_list[i] = NULL;
+    }
+}
+
+// Trouver l'index d'un sommet dans le graphe
+int find_node_index(Graph* graph, char* name) {
+    for (int i = 0; i < graph->num_nodes; i++) {
+        if (strcmp(graph->nodes[i], name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Ajouter un sommet
+void add_node(Graph* graph, char* name) {
+    if (find_node_index(graph, name) == -1) {
+        strcpy(graph->nodes[graph->num_nodes], name);
+        graph->num_nodes++;
+    }
+}
+
+// Ajouter un arc
+void add_edge(Graph* graph, char* from, char* to) {
+    int from_index = find_node_index(graph, from);
+    if (from_index == -1) return;
+
+    Node* new_node = (Node*)malloc(sizeof(Node));
+    strcpy(new_node->name, to);
+    new_node->next = graph->adjacency_list[from_index];
+    graph->adjacency_list[from_index] = new_node;
+}
+
+// Charger le graphe depuis un fichier
+void load_graph_from_file(Graph* graph, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        printf("Erreur : Impossible d'ouvrir le fichier %s\n", filename);
+        exit(1);
+    }
+
+    char from[MAX_NAME_LENGTH], to[MAX_NAME_LENGTH];
+    while (fscanf(file, "%s %s", from, to) == 2) {
+        add_node(graph, from);
+        add_node(graph, to);
+        add_edge(graph, from, to);
+    }
+
+    fclose(file);
+}
