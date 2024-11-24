@@ -1,0 +1,8 @@
+Phytoplancton Zooplancton
+Algues Poissons_herbivores
+Zooplancton Poissons_herbivores
+Zooplancton Poissons_carnivores
+Poissons_herbivores Poissons_carnivores
+Poissons_carnivores Poulpes
+Poissons_carnivores Requins
+Poulpes Requins
