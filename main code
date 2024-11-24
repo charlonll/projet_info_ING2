@@ -1,0 +1,335 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_NODES 100
+#define MAX_NAME_LENGTH 50
+
+// Structure pour représenter un nœud
+typedef struct Node {
+    char name[MAX_NAME_LENGTH];
+    struct Node* next;
+} Node;
+
+// Structure pour représenter le graphe
+typedef struct Graph {
+    int num_nodes;
+    char nodes[MAX_NODES][MAX_NAME_LENGTH];
+    Node* adjacency_list[MAX_NODES];
+} Graph;
+
+// Initialiser le graphe
+void initialize_graph(Graph* graph) {
+    graph->num_nodes = 0;
+    for (int i = 0; i < MAX_NODES; i++) {
+        graph->adjacency_list[i] = NULL;
+    }
+}
+
+// Trouver l'index d'un sommet dans le graphe
+int find_node_index(Graph* graph, char* name) {
+    for (int i = 0; i < graph->num_nodes; i++) {
+        if (strcmp(graph->nodes[i], name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Ajouter un sommet
+void add_node(Graph* graph, char* name) {
+    if (find_node_index(graph, name) == -1) {
+        strcpy(graph->nodes[graph->num_nodes], name);
+        graph->num_nodes++;
+    }
+}
+
+// Ajouter un arc
+void add_edge(Graph* graph, char* from, char* to) {
+    int from_index = find_node_index(graph, from);
+    if (from_index == -1) return;
+
+    Node* new_node = (Node*)malloc(sizeof(Node));
+    strcpy(new_node->name, to);
+    new_node->next = graph->adjacency_list[from_index];
+    graph->adjacency_list[from_index] = new_node;
+}
+
+// Charger le graphe depuis un fichier
+void load_graph_from_file(Graph* graph, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        printf("Erreur : Impossible d'ouvrir le fichier %s\n", filename);
+        exit(1);
+    }
+
+    char from[MAX_NAME_LENGTH], to[MAX_NAME_LENGTH];
+    while (fscanf(file, "%s %s", from, to) == 2) {
+        add_node(graph, from);
+        add_node(graph, to);
+        add_edge(graph, from, to);
+    }
+
+    fclose(file);
+}
+
+// Afficher les propriétés du graphe
+void display_graph(Graph* graph) {
+    printf("\nSommets :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        printf("- %s\n", graph->nodes[i]);
+    }
+
+    printf("\nArcs :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        Node* temp = graph->adjacency_list[i];
+        while (temp != NULL) {
+            printf("- %s -> %s\n", graph->nodes[i], temp->name);
+            temp = temp->next;
+        }
+    }
+
+    printf("\nSuccesseurs :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        printf("%s : ", graph->nodes[i]);
+        Node* temp = graph->adjacency_list[i];
+        while (temp != NULL) {
+            printf("%s ", temp->name);
+            temp = temp->next;
+        }
+        printf("\n");
+    }
+
+    printf("\nPrédécesseurs :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        printf("%s : ", graph->nodes[i]);
+        for (int j = 0; j < graph->num_nodes; j++) {
+            Node* temp = graph->adjacency_list[j];
+            while (temp != NULL) {
+                if (strcmp(temp->name, graph->nodes[i]) == 0) {
+                    printf("%s ", graph->nodes[j]);
+                }
+                temp = temp->next;
+            }
+        }
+        printf("\n");
+    }
+}
+
+// Vérification de la connexité faible
+int is_weakly_connected(Graph* graph) {
+    int visited[MAX_NODES] = {0};
+    int stack[MAX_NODES], stack_top = -1;
+
+    visited[0] = 1;
+    stack[++stack_top] = 0;
+
+    while (stack_top >= 0) {
+        int current = stack[stack_top--];
+        Node* temp = graph->adjacency_list[current];
+
+        // Explorer les successeurs
+        while (temp) {
+            int index = find_node_index(graph, temp->name);
+            if (!visited[index]) {
+                visited[index] = 1;
+                stack[++stack_top] = index;
+            }
+            temp = temp->next;
+        }
+
+        // Explorer les prédécesseurs
+        for (int i = 0; i < graph->num_nodes; i++) {
+            temp = graph->adjacency_list[i];
+            while (temp) {
+                if (strcmp(temp->name, graph->nodes[current]) == 0 && !visited[i]) {
+                    visited[i] = 1;
+                    stack[++stack_top] = i;
+                }
+                temp = temp->next;
+            }
+        }
+    }
+
+    for (int i = 0; i < graph->num_nodes; i++) {
+        if (!visited[i]) return 0;
+    }
+    return 1;
+}
+
+// Identifier les sommets particuliers
+void find_special_vertices(Graph* graph) {
+    printf("\nProducteurs primaires (sans prédécesseurs) :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        int has_predecessor = 0;
+        for (int j = 0; j < graph->num_nodes; j++) {
+            Node* temp = graph->adjacency_list[j];
+            while (temp != NULL) {
+                if (strcmp(temp->name, graph->nodes[i]) == 0) {
+                    has_predecessor = 1;
+                    break;
+                }
+                temp = temp->next;
+            }
+        }
+        if (!has_predecessor) {
+            printf("- %s\n", graph->nodes[i]);
+        }
+    }
+
+    printf("\nPrédateurs finaux (sans successeurs) :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        if (!graph->adjacency_list[i]) {
+            printf("- %s\n", graph->nodes[i]);
+        }
+    }
+
+    printf("\nEspèces ayant une seule source d’alimentation :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        int count_predecessors = 0;
+        for (int j = 0; j < graph->num_nodes; j++) {
+            Node* temp = graph->adjacency_list[j];
+            while (temp != NULL) {
+                if (strcmp(temp->name, graph->nodes[i]) == 0) {
+                    count_predecessors++;
+                }
+                temp = temp->next;
+            }
+        }
+        if (count_predecessors == 1) {
+            printf("- %s\n", graph->nodes[i]);
+        }
+    }
+}
+
+// Fonction récursive pour calculer le niveau trophique
+int calculate_trophic_level_rec(Graph* graph, int index, int* levels) {
+    if (levels[index] != -1) {
+        // Niveau déjà calculé
+        return levels[index];
+    }
+
+    int max_level = 0;
+
+    // Parcourir les prédécesseurs
+    for (int i = 0; i < graph->num_nodes; i++) {
+        Node* temp = graph->adjacency_list[i];
+        while (temp != NULL) {
+            if (strcmp(temp->name, graph->nodes[index]) == 0) {
+                // Calculer récursivement le niveau trophique du prédécesseur
+                int pred_level = calculate_trophic_level_rec(graph, i, levels);
+                if (pred_level + 1 > max_level) {
+                    max_level = pred_level + 1;
+                }
+            }
+            temp = temp->next;
+        }
+    }
+
+    // Sauvegarder le niveau calculé
+    levels[index] = max_level;
+    return max_level;
+}
+
+// Calculer les niveaux trophiques pour tous les sommets
+void calculate_trophic_levels(Graph* graph) {
+    int levels[MAX_NODES];
+    for (int i = 0; i < graph->num_nodes; i++) {
+        levels[i] = -1; // Initialiser les niveaux trophiques
+    }
+
+    int max_trophic_level = 0;
+    printf("\nNiveaux trophiques :\n");
+    for (int i = 0; i < graph->num_nodes; i++) {
+        int level = calculate_trophic_level_rec(graph, i, levels);
+        printf("- %s : Niveau %d\n", graph->nodes[i], level);
+        if (level > max_trophic_level) {
+            max_trophic_level = level;
+        }
+    }
+
+    printf("\nHauteur trophique maximale : %d\n", max_trophic_level);
+}
+
+// Supprimer une espèce du graphe
+void delete_species(Graph* graph, char* species) {
+    int index = find_node_index(graph, species);
+    if (index == -1) {
+        printf("Erreur : L'espèce %s n'existe pas dans le graphe.\n", species);
+        return;
+    }
+
+    // Supprimer tous les arcs où l'espèce est le successeur
+    for (int i = 0; i < graph->num_nodes; i++) {
+        Node* prev = NULL;
+        Node* current = graph->adjacency_list[i];
+        while (current != NULL) {
+            if (strcmp(current->name, species) == 0) {
+                if (prev == NULL) {
+                    graph->adjacency_list[i] = current->next;
+                } else {
+                    prev->next = current->next;
+                }
+                free(current);
+                break;
+            }
+            prev = current;
+            current = current->next;
+        }
+    }
+
+    // Supprimer tous les arcs du sommet
+    Node* current = graph->adjacency_list[index];
+    while (current != NULL) {
+        Node* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    graph->adjacency_list[index] = NULL;
+
+    // Supprimer l'espèce elle-même
+    strcpy(graph->nodes[index], "");
+}
+
+// Fonction principale
+int main() {
+    Graph graph;
+    initialize_graph(&graph);
+
+    char filename[256];
+    printf("Entrez le nom du fichier contenant le réseau : ");
+    scanf("%s", filename);
+
+    // Charger le graphe
+    load_graph_from_file(&graph, filename);
+
+    // Afficher le graphe
+    display_graph(&graph);
+
+    // Vérifier la connexité
+    if (is_weakly_connected(&graph)) {
+        printf("\nLe graphe est faiblement connexe.\n");
+    } else {
+        printf("\nLe graphe n'est pas faiblement connexe.\n");
+    }
+
+    // Identifier les sommets particuliers
+    find_special_vertices(&graph);
+
+    // Calculer les niveaux trophiques
+    calculate_trophic_levels(&graph);
+
+    // Supprimer une espèce
+    char species[MAX_NAME_LENGTH];
+    printf("\nEntrez une espèce à supprimer pour simuler son impact : ");
+    scanf("%s", species);
+
+    delete_species(&graph, species);
+    printf("\nL'espèce %s a été supprimée.\n", species);
+
+    // Réafficher le graphe après suppression
+    display_graph(&graph);
+    calculate_trophic_levels(&graph);
+
+    return 0;
+}
